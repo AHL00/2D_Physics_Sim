@@ -3,3 +3,4 @@ SDL2.dll
 SDL2.lib
 SDL2main.lib
 SDL2test.lib
+src/graphics/mod_old.rs
