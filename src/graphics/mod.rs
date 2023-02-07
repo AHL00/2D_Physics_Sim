@@ -1,7 +1,7 @@
 use sdl2::{self, render::Canvas};
 use std::time;
 
-use crate::SimObject;
+use crate::*;
 
 pub struct Graphics {
     pub sdl_context: sdl2::Sdl,
@@ -82,8 +82,8 @@ impl Graphics {
         if self.current_second_total_frame_time.as_secs() >= 1 {
             let avg_frametime = self.current_second_total_frame_time.as_micros() / self.current_second_update_count as u128;
             println!("{} fps",  1000000 / avg_frametime);
-            println!("{} ms per frame", avg_frametime as f64 / 1000.0);
-            println!("------------------------------------");
+            println!("{} ms/frame", avg_frametime as f64 / 1000.0);
+            println!("-------------------");
             self.current_second_total_frame_time = time::Duration::from_secs(0);
             self.current_second_update_count = 0;
         }
@@ -96,13 +96,13 @@ impl Graphics {
 }
 
 pub struct Camera {
-    pub x: i32,
-    pub y: i32,
+    pub x: u32,
+    pub y: u32,
     pub zoom: f32,
 }
 
 impl Camera {
-    pub fn new(x: i32, y: i32, zoom: f32) -> Camera {
+    pub fn new(x: u32, y: u32, zoom: f32) -> Camera {
         Camera {
             x: x,
             y: y,
@@ -136,7 +136,7 @@ pub enum RenderType {
     },
     Polygon {
         // A polygon must have (0, 0) as the first point
-        points: Vec<(i32, i32)>,
+        vertices: Vec<(u32, u32)>,
     },
     Point,
     Rectangle {
@@ -156,25 +156,89 @@ impl RenderType {
         // Invert the y axis to match the physics
 
         // camera offset
-        let camera_coords: (i32, i32);
+        let camera_coords: (u32, u32);
+        let camera_zoom: f64 = 1.0;
+        let pixels_per_meter: f64;
+
+        // calculate pixel per meter
+        pixels_per_meter = 1.0 / camera_zoom;
+
         match self {
             RenderType::Line { magnitude } => {
-                let mut start_point = (coords.0 as i32, coords.1 as i32);
-                let end_x = (coords.0 + (rotation.to_radians().sin() * *magnitude as f64)) as i32;
-                let end_y = (coords.1 + (rotation.to_radians().cos() * *magnitude as f64)) as i32;
+                let mut start_point = (coords.0 as u32, coords.1 as u32);
+                let end_x = (coords.0 + (rotation.to_radians().sin() * *magnitude as f64)) as u32;
+                let end_y = (coords.1 + (rotation.to_radians().cos() * *magnitude as f64)) as u32;
                 let mut end_point = (end_x, end_y);
 
                 start_point.1 = invert_canvas_y(start_point.1, canvas);
                 end_point.1 = invert_canvas_y(end_point.1, canvas);
 
                 canvas.set_draw_color(color);
-                canvas.draw_line(start_point, end_point).unwrap();
+                canvas.draw_line(
+                    (start_point.0 as i32, start_point.1 as i32),
+                    (end_point.0 as i32, end_point.1 as i32)
+                ).unwrap();
             },
             RenderType::Circle { radius, segments } => {
 
             },
-            RenderType::Polygon { points } => {
+            RenderType::Polygon { vertices: points } => {
+                // check if polygon is closed
+                if points[0] != points[points.len() - 1] {
+                    // throw error
+                    println!("ERROR: Polygon is not closed!");
+                    return;
+                }
 
+                // check if more than two points
+                if points.len() < 3 {
+                    // throw error
+                    println!("ERROR: Polygon must have at least 3 points!");
+                    return;
+                }
+
+                // calculate center of polygon
+                let mut center: (u32, u32) = (0, 0);
+                for point in points.iter() {
+                    
+                    center.0 += point.0;
+                    center.1 += point.1;
+                }
+                center.0 /= points.len() as u32;
+                center.1 /= points.len() as u32;
+
+                // render center dot
+                canvas.set_draw_color(color);
+                canvas.draw_point((center.0 as i32, center.1 as i32)).unwrap();
+
+                // calculate the points of the polygon
+                let offset = (coords.0 as u32 - center.0, coords.1 as u32 - center.1);
+                let mut render_points: Vec<(u32, u32)> = Vec::new();
+                for i in 0..points.len() {
+                    let mut point = points[i];
+                    point.0 += offset.0;
+                    point.1 += offset.1;
+                    point.1 = invert_canvas_y(point.1, canvas);
+                    render_points.push(point);
+                }
+
+                // draw the polygon
+                canvas.set_draw_color(color);
+                for i in 0..render_points.len() {
+                    let point = render_points[i];
+                    let next_point = render_points[(i + 1) % render_points.len()];
+                    canvas.draw_line(
+                        (point.0 as i32, point.1 as i32),
+                        (next_point.0 as i32, next_point.1 as i32)
+                    ).unwrap();
+                }
+
+                let last_point = render_points[render_points.len() - 1];
+                let first_point = render_points[0];
+                canvas.draw_line(
+                    (first_point.0 as i32, first_point.1 as i32),
+                    (last_point.0 as i32, last_point.1 as i32)
+                ).unwrap();
             },
             RenderType::Point => {
 
@@ -193,6 +257,6 @@ impl RenderType {
     }
 }
 
-fn invert_canvas_y(y: i32, canvas: &Canvas<sdl2::video::Window>) -> i32 {
-    canvas.output_size().unwrap().1 as i32 - y
+fn invert_canvas_y(y: u32, canvas: &Canvas<sdl2::video::Window>) -> u32 {
+    canvas.output_size().unwrap().1 as u32 - y
 }

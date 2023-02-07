@@ -1,2 +1,5 @@
   - Basic physics
   - Render queue based on render order
+  - Async update functions for every simobject
+  - Camera
+  - Pixels per meter

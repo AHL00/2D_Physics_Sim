@@ -1,8 +1,7 @@
 use std::sync::mpsc;
 use std::thread;
 
-use physics_sim::Simulation;
-use physics_sim::graphics::RenderType;
+use physics_sim::{graphics::{RenderType, RenderObject}, physics::{self, PhysicsObject, ColliderType}, Vector};
 
 fn init_terminal_input() -> mpsc::Receiver<String> {
     // Channel to send input from the input thread to the main loop
@@ -21,25 +20,43 @@ fn init_terminal_input() -> mpsc::Receiver<String> {
 }
 
 fn main() {
-    let mut simulation = physics_sim::Simulation::new((1000000 / 100) as i32,);
+    let time_step = 120;
+    let mut simulation = physics_sim::Simulation::new(
+        (1000000 / time_step) as i32,
+        physics::Physics::new(
+            Vector::new(0.0, -9.807)
+        )
+    );
     let input = init_terminal_input();
 
-    // vertical line at x, y 0, 0 with empty physics object
+    // vertical line at x, y 0, 0 
     simulation.objects.push(
         physics_sim::SimObject::new(
-            100.0,
-            100.0,
+            10.0,
+            50.0,
             0.0, 
-            physics_sim::graphics::RenderObject::new(
+            Some(RenderObject::new(
                 sdl2::pixels::Color::RGB(255, 0, 0),
-                physics_sim::graphics::RenderType::Line {
-                    magnitude: 15.0,
-                }
+                /*RenderType::Polygon { 
+                    vertices: vec![
+                        (0, 0),
+                        (0, 100),
+                        (100, 150),
+                        (100, 50),
+                        (0,0)
+                    ],
+                }*/
+                RenderType::Line { magnitude: (12.0) }
+            )),
+            Some(PhysicsObject::new(
+                ColliderType::Circle { radius: 15.0 },
+                1.0,
+                Vector::new(0.0, 0.0),
+                Vector::new(0.0, 0.0))
             ),
             None,
             Some(|obj: &mut physics_sim::SimObject| {
                 obj.rotation += 0.1;
-                obj.x += 0.1;
                 let render_obj_mut = obj.get_render_object_mut().unwrap();
                 match render_obj_mut.render_type {
                     RenderType::Line { magnitude } => {
@@ -48,22 +65,6 @@ fn main() {
                     _ => {},
                 }
             })
-        )
-    );
-
-    simulation.objects.push(
-        physics_sim::SimObject::new(
-            100.0,
-            100.0,
-            90.0, 
-            physics_sim::graphics::RenderObject::new(
-                sdl2::pixels::Color::RGB(0, 255, 0),
-                physics_sim::graphics::RenderType::Line {
-                    magnitude: 15.0,
-                }
-            ),
-            None,
-            None
         )
     );
     
